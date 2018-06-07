@@ -10,79 +10,68 @@ def load_file(input_file):
     return pose_details
 
 
-def individual_move(pose_points1, pose_points2):
-    """
-    Calculates weighted average distance between coordinates
-    of a person captured in consecutive images   
-    :param pose_points1: (x1, y1, c1 ...) array of person at time T1 
-    :param pose_points2: (x1, y1, c1 ...) array of person at time T2 
-    :return: weighted average displacement
-    """
+def jedi_match(json1, json2):
+    pose_points1 = json1['people'][0]['pose_keypoints']
+    pose_points2 = json2['people'][0]['pose_keypoints']
+    pers_score = pose_match(pose_points1, pose_points2)
+    return pers_score
 
+
+def pose_match(pose_points1, pose_points2):
+    """
+    # // Result for COCO (18 body parts)
+    # // POSE_COCO_BODY_PARTS {
+    # //     {0,  "Nose"},
+    # //     {1,  "Neck"},
+    # //     {2,  "RShoulder"},
+    # //     {3,  "RElbow"},
+    # //     {4,  "RWrist"},
+    # //     {5,  "LShoulder"},
+    # //     {6,  "LElbow"},
+    # //     {7,  "LWrist"},
+    # //     {8,  "RHip"},
+    # //     {9,  "RKnee"},
+    # //     {10, "RAnkle"},
+    # //     {11, "LHip"},
+    # //     {12, "LKnee"},
+    # //     {13, "LAnkle"},
+    # //     {14, "REye"},
+    # //     {15, "LEye"},
+    # //     {16, "REar"},
+    # //     {17, "LEar"},
+    # //     {18, "Background"},
+    # // }
+    # // Important points: [0 - 13]
+    Compares pose similarity between reference model and input image
+    :param pose_points1: (x1, y1, c1 ...) array of reference image
+    :param pose_points2: (x2, y2, c2 ...) array of input model
+    :return: similarity score
+    """
     num_points = int(min(len(pose_points1), len(pose_points2)) / 3)
-
     pt_distances = []
-    conf_weights = []
-    wt_distances = []
-
-    for i in range(0, num_points):
+    pt_proximity = []
+    imp_points = range(0, 14) # Ignore REye, LEye, REar, LEar, Background
+    for i in imp_points:
         x1 = pose_points1[3 * i]
         y1 = pose_points1[3 * i + 1]
         c1 = pose_points1[3 * i + 2]
-
         x2 = pose_points2[3 * i]
         y2 = pose_points2[3 * i + 1]
         c2 = pose_points2[3 * i + 2]
-
         pt_distance = math.sqrt(math.pow(x1 - x2, 2) + math.pow(y1 - y2, 2))
-        sum_conf = c1 + c2
-        wt_distance = sum_conf * pt_distance
         pt_distances.append(pt_distance)
-        conf_weights.append(sum_conf)
-        wt_distances.append(wt_distance)
+        pt_pct_closeness = max(100.0 - pt_distance, 20.0)
+        pt_proximity.append(pt_pct_closeness)
 
     total_displacement = 0.0
-    total_weighted_displacement = 0.0
+    total_pct_proximity = 0.0
     total_conf_sum = 0.0
 
-    for i in range(0, num_points):
+    for i in imp_points:
         total_displacement += pt_distances[i]
-        total_weighted_displacement += wt_distances[i]
-        total_conf_sum += conf_weights[i]
+        total_pct_proximity += pt_proximity[i]
 
-    # print("Total displacement: " + str(total_displacement))
-    # print("Avg displacement: " + str(total_displacement/num_points))
-    # print("Sum weighted displacement " + str(total_weighted_displacement))
-    # print("Total conf sum " + str(total_conf_sum))
-    # print("Average weighted displacement " + str(total_weighted_displacement/total_conf_sum))
-    return total_weighted_displacement/total_conf_sum
-
-
-def group_move(json1, json2):
-    """
-    Scores results for json captured for two consecutive images    
-    :param json1: rendered json for the image at time T1     
-    :param json2: rendered json for the image at time T2     
-    :return: An array containing: [average group score, total group score, number of people, array of individual scores]
-    """
-
-    num_people = min(len(json1['people']), len(json2['people'])) # Take care of divide by zero error
-    pers_scores = []
-    group_score = 0.0
-
-    for i in range(0, num_people):
-        pose_points1 = json1['people'][i]['pose_keypoints']
-        pose_points2 = json2['people'][i]['pose_keypoints']
-        pers_score = individual_move(pose_points1, pose_points2)
-        pers_scores.append(pers_score)
-        group_score += pers_score
-
-    # print(num_people)
-    # print("Group total: " + str(group_score))
-    # print("Group average: " + str(group_score/num_people))
-    # print("Individual totals: " + str(pers_scores))
-
-    return [group_score/max(num_people, 1), group_score, num_people, pers_scores]
+    return total_pct_proximity / len(imp_points)
 
 
 def fetch_score(file1, file2):
@@ -94,19 +83,16 @@ def fetch_score(file1, file2):
     """
     pose_details1 = load_file(file1)
     pose_details2 = load_file(file2)
-    return group_move(pose_details1, pose_details2)
+    return jedi_match(pose_details1, pose_details2)
 
 
 def main(argv):
-    file1 = os.path.expanduser('~') + '/dev/lib-ddr/img-test/processed/img_t1_keypoints.json'
-    file2 = os.path.expanduser('~') + '/dev/lib-ddr/img-test/processed/img_t2_keypoints.json'
+    file1 = os.path.expanduser('~') + '/dev/ddr/tmp/jedi12018-06-07T01_20_07.196285.json'
+    file2 = os.path.expanduser('~') + '/dev/ddr/tmp/imag12018-06-07T11_49_06.275068.json'
 
-    group_result = fetch_score(file1, file2)
+    pose_match_result = fetch_score(file1, file2)
 
-    print("Group average: " + str(group_result[0]))
-    print("Total Group score: " + str(group_result[1]))
-    print("Num people: " + str(group_result[2]))
-    print("Individual totals: " + str(group_result[3]))
+    print(pose_match_result)
 
     return
 
