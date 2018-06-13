@@ -11,8 +11,8 @@ collectionId = 'jedi-masters'
 s3prefix = 'jedi-masters/profiles/'
 s3region = 'us-west-2'
 dynamodb = boto3.resource('dynamodb', region_name=s3region)
-jediTable = 'jedi-ddb-JediMastersTable-EE8QGGLK5JSH'
-leaderboardTable = 'jedi-lb-ddb-JediLeaderboardTable-1LL3HHANF84BZ'
+jediTable = 'jedi-api-1-JediMastersTable-ULEE551IZUBC'
+leaderboardTable = 'jedi-api-1-JediLeaderboardTable-GIX3T7A78DVM'
 
 def registerUser(nickname, firstName, lastName, hasDP = True):
   regData = {'nick_name': nickname, 'first_name': firstName, 'last_name': lastName, 'scores': {}}
@@ -101,16 +101,16 @@ def scoreTotal(nickname):
   return avg
 
 def main(argv):
-  # registerUser('vsnyc1', 'Vinod', 'Shukla', hasDP=False)
-  # saveScore('vsnyc1', 1, '80.0')
-  # saveScore('vsnyc1', 2, '70.0')
+  registerUser('vsnyc', 'Vinod', 'Shukla', hasDP=False)
+  saveScore('vsnyc', 1, '80.0')
+  saveScore('vsnyc', 2, '90.0')
   # #saveScore('vsnyc', 'Total', 80.0)
-  # score1 = fetchScore('vsnyc1', 1)
-  # scoreT = scoreTotal('vsnyc1')
-  # print(score1)
-  # print(scoreT)
+  score1 = fetchScore('vsnyc', 1)
+  scoreT = scoreTotal('vsnyc')
+  print(score1)
+  print(scoreT)
   #updateLeaderboard('vsnyc')
-  #updateLeaderboard('vsnyc1')
+  updateLeaderboard('vsnyc')
   fetchLeaderboard()
 
 
