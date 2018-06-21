@@ -121,6 +121,7 @@
                                         "dynamodb:CreateTable",
                                         "dynamodb:DescribeTable",
                                         "dynamodb:GetItem",
+                                        "dynamodb:UpdateItem",
                                         "dynamodb:ListTables",
                                         "dynamodb:PutItem",
                                         "dynamodb:Query",
