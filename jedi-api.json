@@ -302,7 +302,7 @@
                     "Ref": "KeyName"
                 },
                 "IamInstanceProfile": {
-                    "Ref": "JediInstanceRole"
+                    "Ref": "JediInstanceProfile"
                 },
                 "SecurityGroupIds": [
                     {
