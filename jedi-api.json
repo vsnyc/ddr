@@ -166,7 +166,10 @@
                                         "s3:Get*",
                                         "s3:List*"
                                     ],
-                                    "Resource": "*"
+                                    "Resource": [
+                                        { "Fn::Sub": "arn:aws:s3:::${ArtifactBucket}" },
+                                        { "Fn::Sub": "arn:aws:s3:::${ArtifactBucket}/*" }
+                                    ]
                                 }
                             ]
                         }
