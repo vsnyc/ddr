@@ -13,6 +13,12 @@
             "Description": "S3 object key prefix. It can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slash (/).",
             "Default": "",
             "Type": "String"
+        },
+        "CollectionName": {
+            "AllowedPattern": "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$",
+            "Description": "Name of Rekognition Collection created to store faceIds. This collection should exist prior to launching this template",
+            "Default": "jedi-masters",
+            "Type": "String"
         }
     },
     "Rules": {
@@ -190,9 +196,9 @@
                 },
                 "Environment": {
                     "Variables": {
-                        "s3bucket": "ddr-code",
-                        "collectionId": "jedi-masters",
-                        "s3prefix": "jedi-masters/profiles/",
+                        "s3bucket": {"Ref": "ArtifactBucket"},
+                        "collectionId": {"Ref": "CollectionName"},
+                        "s3prefix": "profiles/",
                         "s3region": {"Ref": "AWS::Region"},
                         "jediTable": {"Ref": "JediMastersTable"}
                     }
@@ -221,9 +227,9 @@
                 },
                 "Environment": {
                     "Variables": {
-                        "s3bucket": "ddr-code",
-                        "collectionId": "jedi-masters",
-                        "s3prefix": "jedi-masters/profiles/",
+                        "s3bucket": {"Ref": "ArtifactBucket"},
+                        "collectionId": {"Ref": "CollectionName"},
+                        "s3prefix": "profiles/",
                         "s3region": {"Ref": "AWS::Region"},
                         "leaderboardTable": {"Ref": "JediLeaderboardTable"}
                     }
@@ -252,9 +258,9 @@
                 },
                 "Environment": {
                     "Variables": {
-                        "s3bucket": "ddr-code",
-                        "collectionId": "jedi-masters",
-                        "s3prefix": "jedi-masters/profiles/",
+                        "s3bucket": {"Ref": "ArtifactBucket"},
+                        "collectionId": {"Ref": "CollectionName"},
+                        "s3prefix": "profiles/",
                         "s3region": {"Ref": "AWS::Region"},
                         "jediTable": {"Ref": "JediMastersTable"}
                     }
