@@ -101,6 +101,7 @@ def processOpenpose(s3bucket, s3filename, filename, serverIndex, numServers):
 
     s3.Bucket(s3bucket).download_file(s3filename, os.path.expanduser('~') + '/' + s3filename)
     result = processImage(filename, 5555 + serverIndex % numServers)
+    print("Server result: " + str(result))
 
     (nickname, poseNum) = imageInfo(filename)
     jediJsonFile = os.path.expanduser('~') + '/json/jedi_pose{}.json'.format(poseNum)
@@ -112,7 +113,6 @@ def processOpenpose(s3bucket, s3filename, filename, serverIndex, numServers):
     if int(poseNum) == numPoses:
         updateLeaderboard(nickname)
 
-    print("Server result: " + str(result))
     if result == "Done.":
         # heappush(fileQueue, filename)
         rendered_file = filename.replace(".jpg", "_rendered.png")
