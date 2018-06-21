@@ -11,8 +11,8 @@ collectionId = 'jedi-masters'
 s3prefix = 'jedi-masters/profiles/'
 s3region = 'us-west-2'
 dynamodb = boto3.resource('dynamodb', region_name=s3region)
-jediTable = 'jedi-api-1-JediMastersTable-ULEE551IZUBC'
-leaderboardTable = 'jedi-api-1-JediLeaderboardTable-GIX3T7A78DVM'
+jediTable = 'jedi-api-1-JediMastersTable-B5N4X9Q7ZK0K'
+leaderboardTable = 'jedi-api-1-JediLeaderboardTable-1S38W5DL2YTQ3'
 
 def registerUser(nickname, firstName, lastName, hasDP = True):
   regData = {'nick_name': nickname, 'first_name': firstName, 'last_name': lastName, 'scores': {}}
@@ -101,17 +101,26 @@ def scoreTotal(nickname):
   return avg
 
 def main(argv):
-  registerUser('vsnyc', 'Vinod', 'Shukla', hasDP=False)
+  # Registration done via API
+  # e.g. https://m6ijjr30j9.execute-api.us-west-2.amazonaws.com/prod/register?n=vsnyc&f=Vinod&l=Shukla
+  # registerUser('vsnyc', 'Vinod', 'Shukla', hasDP=False)
+
+  saveScore('abc_def', 1, '100.0')
+  saveScore('abc_def', 2, '90.0')
+  updateLeaderboard('abc_def')
+
   saveScore('vsnyc', 1, '80.0')
-  saveScore('vsnyc', 2, '90.0')
-  # #saveScore('vsnyc', 'Total', 80.0)
-  score1 = fetchScore('vsnyc', 1)
-  scoreT = scoreTotal('vsnyc')
-  print(score1)
-  print(scoreT)
-  #updateLeaderboard('vsnyc')
+  saveScore('vsnyc', 2, '80.0')
   updateLeaderboard('vsnyc')
-  fetchLeaderboard()
+
+  # #saveScore('vsnyc', 'Total', 80.0)
+  # score1 = fetchScore('vsnyc', 1)
+  # scoreT = scoreTotal('vsnyc2')
+  # print(score1)
+  # print(scoreT)
+  # #updateLeaderboard('vsnyc')
+
+  # fetchLeaderboard()
 
 
 if __name__ == '__main__':

@@ -388,7 +388,10 @@
         },
         "JediApiStage": {
             "DependsOn": [
-                "ApiGatewayAccount"
+                "ApiGatewayAccount",
+                "RegisterUserRequest",
+                "GetLeaderboardRequest",
+                "GetScoreRequest"
             ],
             "Type": "AWS::ApiGateway::Stage",
             "Properties": {
@@ -467,7 +470,9 @@
         "ApiDeployment": {
             "Type": "AWS::ApiGateway::Deployment",
             "DependsOn": [
-                "RegisterUserRequest"
+                "RegisterUserRequest",
+                "GetLeaderboardRequest",
+                "GetScoreRequest"
             ],
             "Properties": {
                 "RestApiId": {
@@ -851,9 +856,27 @@
                 ]
             }
         },
+        "FetchScoreFunctionARN": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "FetchScoreFunction",
+                    "Arn"
+                ]
+            }
+        },
         "JediApi": {
             "Value": {
                 "Ref": "JediApi"
+            }
+        },
+        "JediMastersTable": {
+            "Value": {
+                "Ref": "JediMastersTable"
+            }
+        },
+        "JediLeaderboardTable": {
+            "Value": {
+                "Ref": "JediLeaderboardTable"
             }
         }
     }
