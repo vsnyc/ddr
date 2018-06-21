@@ -1,0 +1,651 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "ddr",
+    "Parameters": {
+        "ArtifactBucket": {
+            "AllowedPattern": "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$",
+            "Description": "S3 bucket containing the templates and other artifacts to deploy the stack. It can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-).",
+            "Default": "ddr-code",
+            "Type": "String"
+        },
+        "ArtifactKeyPrefix": {
+            "AllowedPattern": "^[0-9a-zA-Z-/]*$",
+            "Description": "S3 object key prefix. It can include numbers, lowercase letters, uppercase letters, hyphens (-), and forward slash (/).",
+            "Default": "",
+            "Type": "String"
+        }
+    },
+    "Rules": {
+        "RekognitionRegionRule": {
+            "Assertions": [
+                {
+                    "Assert": {
+                        "Fn::Contains": [
+                            [
+                                "us-east-1",
+                                "us-west-2",
+                                "eu-west-1"
+                            ],
+                            {
+                                "Ref": "AWS::Region"
+                            }
+                        ]
+                    },
+                    "AssertDescription": "This Quick Start utilizes Amazon Rekognition which is only available in the US East (N. Virginia), US West (Oregon) and EU (Ireland) regions. Please launch the stack in one of these regions"
+                }
+            ]
+        }
+    },
+    "Mappings": {
+        "AWSAMIRegionMap": {
+            "AMI": {
+                "UBUNTUDDR": "ubuntu-ddr-ami"
+            },
+            "eu-west-1": {
+                "UBUNTUDDR": "ami-dcc96ea5"
+            },
+            "us-east-1": {
+                "UBUNTUDDR": "ami-a90fafd3"
+            },
+            "us-west-2": {
+                "UBUNTUDDR": "ami-3c2ae444"
+            }
+        }
+    },
+    "Resources": {
+        "JediMastersTable": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+                "AttributeDefinitions": [
+                    {
+                        "AttributeName": "nick_name",
+                        "AttributeType": "S"
+                    }
+                ],
+                "KeySchema": [
+                    {
+                        "AttributeName": "nick_name",
+                        "KeyType": "HASH"
+                    }
+                ],
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": "2",
+                    "WriteCapacityUnits": "2"
+                },
+                "TimeToLiveSpecification": {
+                    "AttributeName": "ttl",
+                    "Enabled": "TRUE"
+                }
+            }
+        },
+        "JediLeaderboardTable": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+                "AttributeDefinitions": [
+                    {
+                        "AttributeName": "all_scores",
+                        "AttributeType": "S"
+                    }
+                ],
+                "KeySchema": [
+                    {
+                        "AttributeName": "all_scores",
+                        "KeyType": "HASH"
+                    }
+                ],
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": "2",
+                    "WriteCapacityUnits": "2"
+                },
+                "TimeToLiveSpecification": {
+                    "AttributeName": "ttl",
+                    "Enabled": "TRUE"
+                }
+            }
+        },
+        "JediLambdaRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "lambda.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "DdrS3DynamodbAccess",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ],
+                                    "Resource": "arn:aws:logs:*:*:*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "dynamodb:DeleteItem",
+                                        "dynamodb:GetItem",
+                                        "dynamodb:PutItem",
+                                        "dynamodb:Scan",
+                                        "dynamodb:Query",
+                                        "dynamodb:UpdateItem"
+                                    ],
+                                    "Resource": [
+                                        "*"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "RegisterUserFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Ref": "ArtifactBucket"
+                    },
+                    "S3Key": {
+                        "Fn::Sub": "${ArtifactKeyPrefix}assets/RegisterUser.zip"
+                    }
+                },
+                "Environment": {
+                    "Variables": {
+                        "s3bucket": "ddr-code",
+                        "collectionId": "jedi-masters",
+                        "s3prefix": "jedi-masters/profiles/",
+                        "s3region": {"Ref": "AWS::Region"},
+                        "jediTable": {"Ref": "JediMastersTable"}
+                    }
+                },
+                "Handler": "RegisterUser.lambda_handler",
+                "Runtime": "python3.6",
+                "Timeout": "15",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "JediLambdaRole",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "FetchLeaderboardFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Code": {
+                    "S3Bucket": {
+                        "Ref": "ArtifactBucket"
+                    },
+                    "S3Key": {
+                        "Fn::Sub": "${ArtifactKeyPrefix}assets/Leaderboard.zip"
+                    }
+                },
+                "Environment": {
+                    "Variables": {
+                        "s3bucket": "ddr-code",
+                        "collectionId": "jedi-masters",
+                        "s3prefix": "jedi-masters/profiles/",
+                        "s3region": {"Ref": "AWS::Region"},
+                        "leaderboardTable": {"Ref": "JediLeaderboardTable"}
+                    }
+                },
+                "Handler": "Leaderboard.lambda_handler",
+                "Runtime": "python3.6",
+                "Timeout": "15",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "JediLambdaRole",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "JediApi": {
+            "Type": "AWS::ApiGateway::RestApi",
+            "Properties": {
+                "Description": "Api for Jedi Masters Project",
+                "FailOnWarnings": true,
+                "Name": "Jedi Masters API"
+            }
+        },
+        "RegisterUserFunctionLambdaPermission": {
+            "Type": "AWS::Lambda::Permission",
+            "DependsOn": "RegisterUserFunction",
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "RegisterUserFunction",
+                        "Arn"
+                    ]
+                },
+                "Principal": "apigateway.amazonaws.com",
+                "SourceArn": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "arn:aws:execute-api:",
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            ":",
+                            {
+                                "Ref": "AWS::AccountId"
+                            },
+                            ":",
+                            {
+                                "Ref": "JediApi"
+                            },
+                            "/*"
+                        ]
+                    ]
+                }
+            }
+        },
+        "FetchLeaderboardFunctionLambdaPermission": {
+            "DependsOn": "FetchLeaderboardFunction",
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "FetchLeaderboardFunction",
+                        "Arn"
+                    ]
+                },
+                "Principal": "apigateway.amazonaws.com",
+                "SourceArn": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "arn:aws:execute-api:",
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            ":",
+                            {
+                                "Ref": "AWS::AccountId"
+                            },
+                            ":",
+                            {
+                                "Ref": "JediApi"
+                            },
+                            "/*"
+                        ]
+                    ]
+                }
+            }
+        },
+        "JediApiStage": {
+            "DependsOn": [
+                "ApiGatewayAccount"
+            ],
+            "Type": "AWS::ApiGateway::Stage",
+            "Properties": {
+                "DeploymentId": {
+                    "Ref": "ApiDeployment"
+                },
+                "MethodSettings": [
+                    {
+                        "DataTraceEnabled": true,
+                        "HttpMethod": "*",
+                        "LoggingLevel": "INFO",
+                        "ResourcePath": "/*"
+                    }
+                ],
+                "RestApiId": {
+                    "Ref": "JediApi"
+                },
+                "StageName": "prod"
+            }
+        },
+        "ApiGatewayCloudWatchLogsRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "apigateway.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "ApiGatewayLogsPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:DescribeLogGroups",
+                                        "logs:DescribeLogStreams",
+                                        "logs:PutLogEvents",
+                                        "logs:GetLogEvents",
+                                        "logs:FilterLogEvents"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "ApiGatewayAccount": {
+            "Type": "AWS::ApiGateway::Account",
+            "Properties": {
+                "CloudWatchRoleArn": {
+                    "Fn::GetAtt": [
+                        "ApiGatewayCloudWatchLogsRole",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "ApiDeployment": {
+            "Type": "AWS::ApiGateway::Deployment",
+            "DependsOn": [
+                "RegisterUserRequest"
+            ],
+            "Properties": {
+                "RestApiId": {
+                    "Ref": "JediApi"
+                },
+                "StageName": "DummyStage"
+            }
+        },
+        "RegisterUserResource": {
+            "Type": "AWS::ApiGateway::Resource",
+            "Properties": {
+                "RestApiId": {
+                    "Ref": "JediApi"
+                },
+                "ParentId": {
+                    "Fn::GetAtt": [
+                        "JediApi",
+                        "RootResourceId"
+                    ]
+                },
+                "PathPart": "register"
+            }
+        },
+        "LeaderboardResource": {
+            "Type": "AWS::ApiGateway::Resource",
+            "Properties": {
+                "RestApiId": {
+                    "Ref": "JediApi"
+                },
+                "ParentId": {
+                    "Fn::GetAtt": [
+                        "JediApi",
+                        "RootResourceId"
+                    ]
+                },
+                "PathPart": "leaderboard"
+            }
+        },
+        "RegisterUserRequest": {
+            "DependsOn": "RegisterUserFunctionLambdaPermission",
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "ResourceId": {
+                    "Ref": "RegisterUserResource"
+                },
+                "RestApiId": {
+                    "Ref": "JediApi"
+                },
+                "AuthorizationType": "NONE",
+                "HttpMethod": "GET",
+                "Integration": {
+                    "Type": "AWS_PROXY",
+                    "IntegrationHttpMethod": "POST",
+                    "Uri": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "arn:aws:apigateway:",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                ":lambda:path/2015-03-31/functions/",
+                                {
+                                    "Fn::GetAtt": [
+                                        "RegisterUserFunction",
+                                        "Arn"
+                                    ]
+                                },
+                                "/invocations"
+                            ]
+                        ]
+                    },
+                    "IntegrationResponses": [
+                        {
+                            "ResponseTemplates": {
+                                "application/json": ""
+                            },
+                            "StatusCode": 200
+                        }
+                    ],
+                    "PassthroughBehavior": "WHEN_NO_MATCH"
+                },
+                "MethodResponses": [
+                    {
+                        "ResponseModels": {
+                            "application/json": "Empty"
+                        },
+                        "StatusCode": 200
+                    }
+                ]
+            }
+        },
+        "RegisterUserOptionsMethod": {
+            "DependsOn": "RegisterUserFunctionLambdaPermission",
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "ResourceId": {
+                    "Ref": "RegisterUserResource"
+                },
+                "RestApiId": {
+                    "Ref": "JediApi"
+                },
+                "AuthorizationType": "NONE",
+                "HttpMethod": "OPTIONS",
+                "Integration": {
+                    "Type": "MOCK",
+                    "CacheNamespace": {
+                        "Ref": "RegisterUserResource"
+                    },
+                    "RequestTemplates": {
+                        "application/json": "{\"statusCode\": 200}"
+                    },
+                    "IntegrationResponses": [
+                        {
+                            "ResponseParameters": {
+                                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                                "method.response.header.Access-Control-Allow-Methods": "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'",
+                                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                            },
+                            "ResponseTemplates": {
+                                "application/json": ""
+                            },
+                            "StatusCode": 200
+                        }
+                    ],
+                    "PassthroughBehavior": "WHEN_NO_MATCH"
+                },
+                "MethodResponses": [
+                    {
+                        "ResponseModels": {
+                            "application/json": "Empty"
+                        },
+                        "ResponseParameters": {
+                            "method.response.header.Access-Control-Allow-Origin": false,
+                            "method.response.header.Access-Control-Allow-Methods": false,
+                            "method.response.header.Access-Control-Allow-Headers": false
+                        },
+                        "StatusCode": 200
+                    }
+                ]
+            }
+        },
+        "GetLeaderboardRequest": {
+            "DependsOn": "RegisterUserFunctionLambdaPermission",
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "ResourceId": {
+                    "Ref": "LeaderboardResource"
+                },
+                "RestApiId": {
+                    "Ref": "JediApi"
+                },
+                "AuthorizationType": "NONE",
+                "HttpMethod": "GET",
+                "Integration": {
+                    "Type": "AWS_PROXY",
+                    "IntegrationHttpMethod": "POST",
+                    "Uri": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "arn:aws:apigateway:",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                ":lambda:path/2015-03-31/functions/",
+                                {
+                                    "Fn::GetAtt": [
+                                        "FetchLeaderboardFunction",
+                                        "Arn"
+                                    ]
+                                },
+                                "/invocations"
+                            ]
+                        ]
+                    },
+                    "IntegrationResponses": [
+                        {
+                            "ResponseTemplates": {
+                                "application/json": ""
+                            },
+                            "StatusCode": 200
+                        }
+                    ],
+                    "PassthroughBehavior": "WHEN_NO_MATCH"
+                },
+                "MethodResponses": [
+                    {
+                        "ResponseModels": {
+                            "application/json": "Empty"
+                        },
+                        "StatusCode": 200
+                    }
+                ]
+            }
+        },
+        "LeaderboardOptionsMethod": {
+            "DependsOn": "RegisterUserFunctionLambdaPermission",
+            "Type": "AWS::ApiGateway::Method",
+            "Properties": {
+                "ResourceId": {
+                    "Ref": "LeaderboardResource"
+                },
+                "RestApiId": {
+                    "Ref": "JediApi"
+                },
+                "AuthorizationType": "NONE",
+                "HttpMethod": "OPTIONS",
+                "Integration": {
+                    "Type": "MOCK",
+                    "CacheNamespace": {
+                        "Ref": "LeaderboardResource"
+                    },
+                    "RequestTemplates": {
+                        "application/json": "{\"statusCode\": 200}"
+                    },
+                    "IntegrationResponses": [
+                        {
+                            "ResponseParameters": {
+                                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                                "method.response.header.Access-Control-Allow-Methods": "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'",
+                                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                            },
+                            "ResponseTemplates": {
+                                "application/json": ""
+                            },
+                            "StatusCode": 200
+                        }
+                    ],
+                    "PassthroughBehavior": "WHEN_NO_MATCH"
+                },
+                "MethodResponses": [
+                    {
+                        "ResponseModels": {
+                            "application/json": "Empty"
+                        },
+                        "ResponseParameters": {
+                            "method.response.header.Access-Control-Allow-Origin": false,
+                            "method.response.header.Access-Control-Allow-Methods": false,
+                            "method.response.header.Access-Control-Allow-Headers": false
+                        },
+                        "StatusCode": 200
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "RegisterUserFunctionARN": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "RegisterUserFunction",
+                    "Arn"
+                ]
+            }
+        },
+        "FetchLeaderboardFunctionARN": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "FetchLeaderboardFunction",
+                    "Arn"
+                ]
+            }
+        },
+        "JediApi": {
+            "Value": {
+                "Ref": "JediApi"
+            }
+        }
+    }
+}
