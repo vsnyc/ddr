@@ -17,7 +17,9 @@ s3bucket = ddr_config.get_config('s3_bucket')
 s3region = ddr_config.get_config('s3_bucket_region')
 queueUrl = ddr_config.get_config('sqs_url')
 numServers = int(ddr_config.get_config('num_op_servers'))
+numPoses = int(ddr_config.get_config('num_poses'))
 jediMastersTable = ddr_config.get_config('jedi_masters_table')
+leaderboardTable = ddr_config.get_config('jedi_leaderboard_table')
 
 
 
@@ -106,6 +108,9 @@ def processOpenpose(s3bucket, s3filename, filename, serverIndex, numServers):
 
     saveScore(nickname, poseNum, poseScore)
 
+    if int(poseNum) == numPoses:
+        updateLeaderboard(nickname)
+
     print("Server result: " + str(result))
     if result == "Done.":
         # heappush(fileQueue, filename)
@@ -117,6 +122,46 @@ def processOpenpose(s3bucket, s3filename, filename, serverIndex, numServers):
     print("Processed openpose in: " + str(elapsed_time))
 
     return result
+
+def updateLeaderboard(nickname):
+    dynamodb = boto3.resource('dynamodb', region_name=s3region)
+    table = dynamodb.Table(leaderboardTable)
+    try:
+        response = table.update_item(
+          Key={
+            'all_scores': 'dummy'
+          },
+          UpdateExpression="set scores." + nickname + " = :s",
+          ExpressionAttributeValues={
+            ':s': decimal.Decimal(scoreTotal(nickname))
+          },
+          ReturnValues="UPDATED_NEW"
+        )
+    except:
+        scoresData = {
+          'all_scores': 'dummy',
+          'scores': {
+            nickname: decimal.Decimal(scoreTotal(nickname))
+          }
+        }
+        response = table.put_item(
+          Item=scoresData
+        )
+    print(json.dumps(response, indent=4, cls=ddb_util.DecimalEncoder))
+
+
+def scoreTotal(nickname):
+    dynamodb = boto3.resource('dynamodb', region_name=s3region)
+    table = dynamodb.Table(jediMastersTable)
+    response = table.get_item(
+      Key={
+        'nick_name': nickname
+      }
+    )
+    scores = response['Item']['scores'].values()
+    avg = float(sum(scores))/len(scores)
+    return avg
+
 
 def saveScore(nickname, poseNum, score):
     dynamodb = boto3.resource('dynamodb', region_name=s3region)
