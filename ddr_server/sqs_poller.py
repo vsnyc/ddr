@@ -80,7 +80,8 @@ def poll_sqs():
                 QueueUrl=queueUrl,
                 ReceiptHandle=receipt
             )
-    except Exception:
+    except Exception as e:
+        print(str(e))
         # traceback.print_exc()
         print("No messages in sqs")
 
