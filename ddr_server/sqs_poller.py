@@ -40,8 +40,6 @@ def poll_sqs():
         s3Keys = [x['Records'][0]['s3']['object']['key'] for x in msgBodies]
         print(s3Keys)
 
-        pool = Pool(2)
-
         fileQueue = []
 
         serverIndex = 0
@@ -53,26 +51,14 @@ def poll_sqs():
             filename = s3filename[lastSlashIndex + 1: len(s3filename)]
             serverIndex += 1
 
-            # result = processOpenpose(s3, s3bucket, s3filename, filename, serverIndex, numServers)
-            # rekResponse = processRekognition(rekognition, s3bucket, s3filename)
-            opAsync = pool.apply_async(processOpenpose, [s3bucket, s3filename, filename, serverIndex, numServers])
-            # rekAsync = pool.apply_async(processRekognition,[s3bucket, s3filename])
-
-            result = opAsync.get(timeout=10)
-            # rekResponse = rekAsync.get(timeout=10)
+            result = processOpenpose(s3bucket, s3filename, filename, serverIndex, numServers)
 
             elapsed_time = time.time() - start_time
 
             print("Processed s3 file in: " + str(elapsed_time))
 
-            pool.close()
-            pool.join()
-
             if result == "Done.":
                 print("Processed image {}".format(s3filename))
-                # print("Rekognition response\n" + str(rekResponse))
-                # ddb_util.log_processed(filename, processed_table, rekResponse)
-
 
 
         for receipt in receiptHandles:
@@ -82,7 +68,7 @@ def poll_sqs():
             )
     except Exception as e:
         print(str(e))
-        # traceback.print_exc()
+        traceback.print_exc()
         print("No messages in sqs")
 
 def num_groups(regex):
@@ -108,7 +94,11 @@ def processOpenpose(s3bucket, s3filename, filename, serverIndex, numServers):
     nicknameJsonFile = os.path.expanduser('~') + '/json/{}_pose{}.json'.format(nickname, poseNum)
     poseScore = ddr_score.fetch_score(jediJsonFile, nicknameJsonFile)
 
-    saveScore(nickname, poseNum, poseScore)
+    try:
+        saveScore(nickname, poseNum, poseScore)
+    except Exception as e:
+        traceback.print_exc()
+        print(str(e))
 
     if int(poseNum) == numPoses:
         updateLeaderboard(nickname)
@@ -161,7 +151,7 @@ def scoreTotal(nickname):
     )
     scores = response['Item']['scores'].values()
     avg = float(sum(scores))/len(scores)
-    return avg
+    return str(avg)
 
 
 def saveScore(nickname, poseNum, score):
@@ -173,7 +163,7 @@ def saveScore(nickname, poseNum, score):
         },
         UpdateExpression="set scores.pose" + str(poseNum) + " = :s",
         ExpressionAttributeValues={
-            ':s': decimal.Decimal(score)
+            ':s': decimal.Decimal(str(score))
         },
         ReturnValues="UPDATED_NEW"
     )
