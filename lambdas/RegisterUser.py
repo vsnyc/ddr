@@ -34,6 +34,15 @@ def indexFaces(bucket, collectionId, prefix, fileName):
     faceIds.append(faceId)
   return faceIds
 
+def userExists(nickname):
+  table = dynamodb.Table(jediTable)
+  getItemResult = table.get_item(
+      Key={
+      'nick_name': nickname
+      }
+    )
+  return 'Item' in getItemResult
+
 def registerUser(nickname, firstName, lastName, hasDP = True):
   regData = {'nick_name': nickname, 'first_name': firstName, 'last_name': lastName, 'scores': {}}
   if hasDP:
@@ -53,14 +62,20 @@ def lambda_handler(event, context):
   # 'queryStringParameters': {'l': 'shukla', 'f': 'vinod', 'n': 'vsnyc'}
   logger.info('got event {}'.format(event))
   params = event['queryStringParameters']
-  registerResponse = registerUser(params['n'], params['f'], params['l'] )
+  isDuplicate = userExists(nickname=params['n'])
 
-  logger.debug('Registration response is {}'.format(registerResponse))
-
-  status = registerResponse
+  if not isDuplicate:
+    try:
+      registerResponse = registerUser(params['n'], params['f'], params['l'] )
+      logger.debug('Registration response is {}'.format(registerResponse))
+      status = {'statusCode': 200, 'reason': 'Registration successful'}
+    except Exception as e:
+      status = {'statusCode': 400, 'reason': str(e)}
+  else:
+    status = {'statusCode': 400, 'reason': 'Duplicate nickname'}
 
   response = {
-    "statusCode": 200,
+    "statusCode": status['statusCode'],
     "headers": {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST"
